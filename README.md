@@ -1,7 +1,7 @@
 # Django Celery Email
 
-Sends email in the background using Celery with Redis as the broker.
-Has API endpoints, HTML templates, retries on failure, and a daily scheduled email.
+Background email sending with Celery and Redis. API endpoints, HTML templates,
+retries on failure, and a daily scheduled email.
 
 ## Setup
 
@@ -11,8 +11,8 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Copy `.env.example` to `.env` and put in your Gmail address and a 16-character
-app password (Google Account > Security > App passwords — your normal password won't work).
+Copy `.env.example` to `.env` and add your Gmail address and a 16-character app
+password (Google Account > Security > App passwords — the normal password won't work).
 
 ```bash
 python manage.py migrate
@@ -30,64 +30,46 @@ celery -A config beat -l info
 python manage.py runserver
 ```
 
-Form at http://localhost:8000/, admin at http://localhost:8000/admin/
-
-`--pool=solo` is needed on Windows, otherwise the worker picks up tasks but never runs them.
+Form at http://localhost:8000/, admin at /admin/. `--pool=solo` is needed on Windows.
 
 ## API
-
-Send an email:
 
 ```bash
 curl -X POST localhost:8000/api/send-email/ -H "Content-Type: application/json" \
   -d '{"recipient":"someone@gmail.com","subject":"Hello","message":"Sent in the background"}'
 ```
 
-```json
-{"task_id": "10c5b604-2379-49c1-8f53-90986ba15a21", "status": "queued"}
-```
-
-Check it:
+Returns `{"task_id": "...", "status": "queued"}`. Check it with:
 
 ```bash
-curl localhost:8000/api/email-status/10c5b604-2379-49c1-8f53-90986ba15a21/
-```
-
-```json
-{"task_id": "10c5b604-...", "status": "SUCCESS", "result": "sent to someone@gmail.com"}
+curl localhost:8000/api/email-status/<task_id>/
 ```
 
 Status is PENDING, RETRY, SUCCESS or FAILURE.
 
-Use `recipients` as a list instead of `recipient` to send to several people.
-Add `"template": "welcome"` or `"notification"` for HTML, with `context` for the template values.
-
-Bad requests get a 400 before anything is queued — missing fields, invalid email, broken JSON.
+Use `recipients` as a list to send to several people. Add `"template": "welcome"`
+or `"notification"` for HTML, with `context` for the values. Bad requests get a 400
+before anything is queued.
 
 ## Tasks
 
-- `send_email_task` — one recipient, retries 3 times 30 seconds apart if SMTP fails
-- `send_bulk_email_task` — many recipients, carries on past failures and returns which worked
-- `send_daily_report` — runs daily at 9 AM, schedule set with a crontab in Celery Beat
+- `send_email_task` — one recipient, retries 3 times 30 seconds apart
+- `send_bulk_email_task` — many recipients, reports which worked
+- `send_daily_report` — daily at 9 AM via a crontab in Celery Beat
 
-Schedules are stored in the database, so you can add or change them in the admin
-under Periodic Tasks without restarting beat.
+Schedules live in the database so they can be edited in the admin under Periodic
+Tasks without restarting beat.
 
 ## Settings
 
-Gmail SMTP on port 587 with TLS, credentials read from `.env` so nothing secret
-is committed. Timezone is Asia/Kolkata and Celery uses the same one, so crontab
-times mean local time.
+Gmail SMTP on port 587 with TLS, credentials from `.env`. Timezone is Asia/Kolkata
+for both Django and Celery.
 
 ## Layout
 
 ```
-config/
-  celery.py      celery app
-  settings.py    smtp, broker, beat
-emails/
-  tasks.py       the email tasks
-  views.py       endpoints and validation
-  templates/emails/   base, welcome, notification, form
-  management/commands/setup_periodic_tasks.py
+config/    celery.py  settings.py
+emails/    tasks.py  views.py  urls.py
+           templates/emails/  (base, welcome, notification, form)
+           management/commands/setup_periodic_tasks.py
 ```
