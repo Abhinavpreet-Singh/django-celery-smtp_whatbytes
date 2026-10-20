@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <title>Send Email</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 480px; margin: 40px auto; }
+    input, textarea, select, button { width: 100%; padding: 8px; margin: 6px 0 14px; }
+    pre { background: #f4f4f4; padding: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Send Email</h2>
+  <form id="form">
+    <label>Recipient</label>
+    <input name="recipient" type="email" required>
+    <label>Subject</label>
+    <input name="subject" required>
+    <label>Message</label>
+    <textarea name="message" rows="4" required></textarea>
+    <label>Template</label>
+    <select name="template">
+      <option value="">Plain text</option>
+      <option value="welcome">Welcome</option>
+      <option value="notification">Notification</option>
+    </select>
+    <button type="submit">Send</button>
+  </form>
+  <pre id="output"></pre>
+
+  <script>
+    const output = document.getElementById('output');
+
+    document.getElementById('form').onsubmit = async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target));
+      if (!data.template) delete data.template;
+
+      const res = await fetch('/api/send-email/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const body = await res.json();
+      output.textContent = JSON.stringify(body, null, 2);
+
+      if (body.task_id) pollStatus(body.task_id);
+    };
+
+    async function pollStatus(taskId) {
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const res = await fetch(`/api/email-status/${taskId}/`);
+        const body = await res.json();
+        output.textContent = JSON.stringify(body, null, 2);
+        if (body.status === 'SUCCESS' || body.status === 'FAILURE') return;
+      }
+    }
+  </script>
+</body>
+</html>

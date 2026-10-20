@@ -1,0 +1,5 @@
+{% extends 'emails/base.html' %}
+{% block content %}
+  <h2>Welcome{% if name %}, {{ name }}{% endif %}</h2>
+  <p>{{ message }}</p>
+{% endblock %}
